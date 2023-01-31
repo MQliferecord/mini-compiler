@@ -1,0 +1,23 @@
+(function (modules) {
+    function requireModule(id) {
+
+        const {fn,mapping} = modules[id]
+        const module = {
+            exports: {}
+        }
+        function localRequire(filePath){
+            const id = mapping[filePath]
+            return requireModule(id)
+        }
+        fn(localRequire, module, module.exports)
+
+        return module.exports
+    }
+    requireModule(0)
+})({
+    <%-data.forEach(info=>{%>
+    "<%-info["id"]%>": [function (require, module, exports) {
+        <%-info["code"]%>
+    },<%-JSON.stringify(info["mapping"])%>]
+})
+})

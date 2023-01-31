@@ -11,15 +11,21 @@ let id = 0;
  * @createAsset
  * 1.获取文件内容
  * 2.获取抽象语法树
- * 3.获取依赖关系，traverse遍历节点，找到节点中存的source.value
- * 4.将遍历得到的source中的值使用的ejs导入转换成为cjs代码
+ * 3.获取依赖关系，traverse遍历节点，找到相关文件的import
+ * 4.将得到的import数据放到deps数组中
+ * 5.将得到的文件的内容source从ejs转换成为cjs
+ * 6.最后抛出
+ * （1）filePath 自身文件的地址
+ * （2）code 自身的cjs模式下的代码
+ * （3）deps 自身引用的文件
+ * （4）mapping 给后面防止索引的空对象
+ * （5）id 当前执行文件在图中的序列号
  */
 
 function createAsset(filePath){
     const source = fs.readFileSync(filePath,{
         encoding:"utf-8"
     })
-
     const ast = parser.parse(source,{
         sourceType:"module"
     })
@@ -46,9 +52,17 @@ function createAsset(filePath){
 
 /**
  * @createGraph
- * 建立关系图
- * 之所以使用图模型，主要是循环引用
- * 输出各个文件的value和import
+ * 从createAsset得到入口文件创建的对象
+ * 然后对其和他的引用文件进行广度遍历
+ * 这里采用队列的数据结构，也可以使用递归直到asset的deps==null
+ * 将得到的数据存在队列数组中
+ * 
+ * 同时将deps中的引用路径和引用文件的id号以key(引用路径)-value(id号)
+ * 主要是后续在模板文件中希望通过source内的引用value找到mapping中的id号，然后找到模板中id对应的文件
+ * 
+ * 成功建立关系图
+ * 之所以使用图模型，主要是各个文件之间可能存在循环引用
+ * 输出是多个asset组成的数组，每个asset的mapping插入了索引
  * */
 function createGraph(){
     const mainAsset = createAsset("./example/main.js");
@@ -68,12 +82,13 @@ function createGraph(){
 
 const graph = createGraph()
 
-
 /**
- * @graph 
- * 创建模板格式key:value
- * 根据理想的代码格式
- * 希望template中的数据转换成filePath和code
+ * @build
+ * 引入实现写好的模板
+ * 对graph中的key-value数据进行遍历
+ * 将指定数据导出到data对象中
+ * 在template调用data中的数据
+ * 得到的代码写入dist/bundle.js也就是打包后的文件
  */
 function build(graph){
     const template = fs.readFileSync("./bundle.ejs",{encoding:"utf-8"});
